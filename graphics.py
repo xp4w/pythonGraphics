@@ -352,7 +352,8 @@ class GraphWin(tk.Canvas):
         not been clicked since last call"""
         if self.isClosed():
             raise GraphicsError("checkMouse in closed window")
-        self.update()
+        if self.autoflush:  #SN: Added 02.07.20
+            self.update()   #SN: Added 02.07.20
         if self.mouseX != None and self.mouseY != None:
             x, y = self.toWorld(self.mouseX, self.mouseY)
             self.mouseX = None
@@ -391,7 +392,8 @@ class GraphWin(tk.Canvas):
         """Return last key pressed or None if no key pressed since last call"""
         if self.isClosed():
             raise GraphicsError("checkKey in closed window")
-        self.update()
+        if self.autoflush:  #SN: Added 02.07.20
+            self.update()   #SN: Added 02.07.20
         # key = self.lastKey
         # self.lastKey = ""
         # return key
@@ -1171,11 +1173,13 @@ class Image(GraphicsObject):
         self.anchor = p.clone()
         self.imageId = Image.idCount
         self.pilImage = None  # DJC: 01.30.19.14.44 Original PIL Image
+        self.pilImageTransformed = None # DJC: 04.20.22.09.22
         Image.idCount = Image.idCount + 1
         if len(pixmap) == 1:  # file name provided
             # DJC: 01.30.19.14.45 Added PIL Support
             if importedPillow:
                 self.pilImage = PILIMage.open(pixmap[0])  # Save original to reference & prevent image degradation
+                self.pilImageTransformed = self.pilImage.copy()
                 self.img = PILImageTK.PhotoImage(self.pilImage, master=_root)
             else:
                 self.img = tk.PhotoImage(file=pixmap[0], master=_root)
@@ -1226,13 +1230,19 @@ class Image(GraphicsObject):
         r,g,b are in range(256)
         """
 
-        value = self.img.get(x, y)
-        if type(value) == type(0):
-            return [value, value, value]
-        elif type(value) == type((0, 0, 0)):
-            return list(value)
+        # DJC: 04.19.22.10.00 Added PIL Support
+        if importedPillow:
+            loc = (x, y)
+            return self.pilImageTransformed.getpixel(loc)
+
         else:
-            return list(map(int, value.split()))
+            value = self.img.get(x, y)
+            if type(value) == type(0):
+                return [value, value, value]
+            elif type(value) == type((0, 0, 0)):
+                return list(value)
+            else:
+                return list(map(int, value.split()))
 
     def setPixel(self, x, y, color):
         """Sets pixel (x,y) to the given color
@@ -1252,17 +1262,17 @@ class Image(GraphicsObject):
     def transform(self, scale=1, angle=0):
         """Resizes and/or Rotates the 'original' image according to the scale/angle passed."""
         if importedPillow:
-            tempImg = self.pilImage.copy()
-            newWidth = int(tempImg.width * scale)
-            newHeight = int(tempImg.height * scale)
-            tempImg = tempImg.resize((newWidth, newHeight), resample=PILIMage.BILINEAR)
-            tempImg = tempImg.rotate(angle, resample=PILIMage.BILINEAR, expand=True)
-            self.img = PILImageTK.PhotoImage(tempImg, master=_root)
+            self.pilImageTransformed = self.pilImage.copy()
+            newWidth = int(self.pilImageTransformed.width * scale)
+            newHeight = int(self.pilImageTransformed.height * scale)
+            self.pilImageTransformed = self.pilImageTransformed.resize((newWidth, newHeight), resample=PILIMage.BILINEAR)
+            self.pilImageTransformed = self.pilImageTransformed.rotate(angle, resample=PILIMage.BILINEAR, expand=True)
+            self.img = PILImageTK.PhotoImage(self.pilImageTransformed, master=_root)
         else:
             raise Exception("You need to install the Pillow module to resize/rotate images."
                             "\n           For instructions, see: https://pillow.readthedocs.io/en/3.3.x/installation.html")
     # DJC: End
-    
+
     @staticmethod   # DJC: Added 04.20.21.14.51
     def testCollision_ImageVsImage(image1, image2):
         """Returns True if the two Images are colliding, False if not."""
