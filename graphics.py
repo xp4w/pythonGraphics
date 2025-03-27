@@ -55,7 +55,7 @@ __version__ = "5.0"
 #     * update takes an optional parameter specifying update rate
 #     * Entry objects get focus when drawn
 #     * __repr_ for all objects
-#     * fixed offset problem in window, made canvas borderless
+#     * fixed offset problem in window, made window borderless
 
 # Version 4.3 4/25/2014
 #     * Fixed Image getPixel to work with Python 3.4, TK 8.6 (tuple type handling)
@@ -522,8 +522,8 @@ class Transform:
 #   keys may be present in the configuration dictionary for a given item
 DEFAULT_CONFIG = {"fill": "",
                   "activefill": "",  # BB added ActiveFill 3/9/2018
-                  "outline": "black",
-                  "width": "1",
+                  "outline": "",
+                  "width": "0",
                   "arrow": "none",
                   "text": "",
                   "justify": "center",
@@ -537,14 +537,14 @@ class GraphicsObject:
     # A subclass of GraphicsObject should override _draw and
     #   and _move methods.
 
-    def __init__(self, options):
+    def __init__(self, options: list):
         # options is a list of strings indicating which options are
         # legal for this object.
 
-        # When an object is drawn, canvas is set to the GraphWin(canvas)
+        # When an object is drawn, window is set to the GraphWin(window)
         #    object where it is drawn and id is the TK identifier of the
         #    drawn shape.
-        self.canvas = None
+        self.window = None
         self.id = None
 
         # config is the dictionary of configuration options for the widget.
@@ -553,32 +553,63 @@ class GraphicsObject:
             config[option] = DEFAULT_CONFIG[option]
         self.config = config
 
-    def setFill(self, color):
+    @property
+    def fill(self) -> str:
+        """Returns self.config["fill"]"""
+        return self.config["fill"]
+    
+    @fill.setter
+    def fill(self, color):
         """Set interior color to color"""
         self._reconfig("fill", color)
 
-    def setOutline(self, color):
+    @property
+    def outline(self) -> str:
+        """Returns self.config["outline"]"""
+        return self.config["outline"]
+    
+    @outline.setter
+    def outline(self, color):
         """Set outline color to color"""
         self._reconfig("outline", color)
 
-    def setWidth(self, width):
+    @property
+    def width(self) -> int:
+        """Returns self.config["width"]"""
+        return self.config["width"]
+
+    @width.setter
+    def width(self, width):
         """Set line weight to width"""
         self._reconfig("width", width)
 
-    def setActiveFill(self, color):  # Added By BB 3/8
+    @property
+    def activefill(self) -> str:
+        """Returns self.config["activefill"]"""
+        return self.config["activefill"]
+
+    @activefill.setter
+    def activefill(self, color):  # Added By BB 3/8
+        """Set activefill color to color"""
         self._reconfig("activefill", color)
 
-    def setSmooth(self, bool):  # Niss: added 1.05.2017
+    @property
+    def smooth(self) -> bool:
+        """Returns self.config["smooth"]"""
+        return self.config["smooth"]
+
+    @smooth.setter
+    def smooth(self, bool):  # Niss: added 1.05.2017
         """Set smooth boolean to bool"""
         self._reconfig("smooth", bool)
 
     def redraw(self):  # Niss: added 1.05.2017
         """Redraws the object (i.e. hide it and then makes visible again) aReturns silently if the
         object is not currently drawn."""
-        if not self.canvas: return
-        if not self.canvas.isClosed():
-            self.canvas.delete(self.id)
-        self.id = self._draw(self.canvas, self.config)
+        if not self.window: return
+        if not self.window.isClosed():
+            self.window.delete(self.id)
+        self.id = self._draw(self.window, self.config)
 
     def draw(self, graphwin):
 
@@ -587,9 +618,9 @@ class GraphicsObject:
         window. Raises an error if attempt made to draw an object that
         is already visible."""
 
-        if self.canvas and not self.canvas.isClosed(): raise GraphicsError(OBJ_ALREADY_DRAWN)
+        if self.window and not self.window.isClosed(): raise GraphicsError(OBJ_ALREADY_DRAWN)
         if graphwin.isClosed(): raise GraphicsError("Can't draw to closed window")
-        self.canvas = graphwin
+        self.window = graphwin
         self.id = self._draw(graphwin, self.config)
         graphwin.addItem(self)
         if graphwin.autoflush:
@@ -601,13 +632,13 @@ class GraphicsObject:
         """Undraw the object (i.e. hide it). Returns silently if the
         object is not currently drawn."""
 
-        if not self.canvas: return
-        if not self.canvas.isClosed():
-            self.canvas.delete(self.id)
-            self.canvas.delItem(self)
-            if self.canvas.autoflush:
+        if not self.window: return
+        if not self.window.isClosed():
+            self.window.delete(self.id)
+            self.window.delItem(self)
+            if self.window.autoflush:
                 _root.update()
-        self.canvas = None
+        self.window = None
         self.id = None
 
     def move(self, dx, dy):
@@ -616,17 +647,17 @@ class GraphicsObject:
         direction"""
 
         self._move(dx, dy)
-        canvas = self.canvas
-        if canvas and not canvas.isClosed():
-            trans = canvas.trans
+        window = self.window
+        if window and not window.isClosed():
+            trans = window.trans
             if trans:
                 x = dx / trans.xscale
                 y = -dy / trans.yscale
             else:
                 x = dx
                 y = dy
-            self.canvas.move(self.id, x, y)
-            if canvas.autoflush:
+            self.window.move(self.id, x, y)
+            if window.autoflush:
                 _root.update()
 
     def _reconfig(self, option, setting):
@@ -637,13 +668,13 @@ class GraphicsObject:
             raise GraphicsError(UNSUPPORTED_METHOD)
         options = self.config
         options[option] = setting
-        if self.canvas and not self.canvas.isClosed():
-            self.canvas.itemconfig(self.id, options)
-            if self.canvas.autoflush:
+        if self.window and not self.window.isClosed():
+            self.window.itemconfig(self.id, options)
+            if self.window.autoflush:
                 _root.update()
 
-    def _draw(self, canvas, options):
-        """draws appropriate figure on canvas with options provided
+    def _draw(self, window, options):
+        """draws appropriate figure on window with options provided
         Returns Tk id of item drawn"""
         pass  # must override in subclass
 
@@ -662,9 +693,9 @@ class Point(GraphicsObject):
     def __repr__(self):
         return "Point({}, {})".format(self.x, self.y)
 
-    def _draw(self, canvas, options):
-        x, y = canvas.toScreen(self.x, self.y)
-        return canvas.create_rectangle(x, y, x + 1, y + 1, options)
+    def _draw(self, window, options):
+        x, y = window.toScreen(self.x, self.y)
+        return window.create_rectangle(x, y, x + 1, y + 1, options)
 
     def _move(self, dx, dy):
         self.x = self.x + dx
@@ -712,12 +743,12 @@ class Rectangle(_BBox):
     def __repr__(self):
         return "Rectangle({}, {})".format(str(self.p1), str(self.p2))
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p1 = self.p1
         p2 = self.p2
-        x1, y1 = canvas.toScreen(p1.x, p1.y)
-        x2, y2 = canvas.toScreen(p2.x, p2.y)
-        return canvas.create_rectangle(x1, y1, x2, y2, options)
+        x1, y1 = window.toScreen(p1.x, p1.y)
+        x2, y2 = window.toScreen(p2.x, p2.y)
+        return window.create_rectangle(x1, y1, x2, y2, options)
 
     def clone(self):
         other = Rectangle(self.p1, self.p2)
@@ -786,8 +817,8 @@ class RoundedRectangle(Rectangle):  # BB added 3/9/2018
         other.config = self.config.copy()
         return other
 
-    def _draw(self, canvas, options):
-        return canvas.create_polygon(self.points, options, smooth=True)
+    def _draw(self, window, options):
+        return window.create_polygon(self.points, options, smooth=True)
 
 
 class Oval(_BBox):
@@ -802,12 +833,12 @@ class Oval(_BBox):
         other.config = self.config.copy()
         return other
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p1 = self.p1
         p2 = self.p2
-        x1, y1 = canvas.toScreen(p1.x, p1.y)
-        x2, y2 = canvas.toScreen(p2.x, p2.y)
-        return canvas.create_oval(x1, y1, x2, y2, options)
+        x1, y1 = window.toScreen(p1.x, p1.y)
+        x2, y2 = window.toScreen(p2.x, p2.y)
+        return window.create_oval(x1, y1, x2, y2, options)
 
 
 class Arc(_BBox):
@@ -834,12 +865,12 @@ class Arc(_BBox):
         other.config = self.config.copy()
         return other
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p1 = self.p1
         p2 = self.p2
-        x1, y1 = canvas.toScreen(p1.x, p1.y)
-        x2, y2 = canvas.toScreen(p2.x, p2.y)
-        return canvas.create_arc(x1, y1, x2, y2, options, style=self.style, start=self.startAngle, extent=self.rotation)
+        x1, y1 = window.toScreen(p1.x, p1.y)
+        x2, y2 = window.toScreen(p2.x, p2.y)
+        return window.create_arc(x1, y1, x2, y2, options, style=self.style, start=self.startAngle, extent=self.rotation)
 
 
 class Circle(Oval):
@@ -901,12 +932,12 @@ class Line(_BBox):
         other.config = self.config.copy()
         return other
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p1 = self.p1
         p2 = self.p2
-        x1, y1 = canvas.toScreen(p1.x, p1.y)
-        x2, y2 = canvas.toScreen(p2.x, p2.y)
-        return canvas.create_line(x1, y1, x2, y2, options)
+        x1, y1 = window.toScreen(p1.x, p1.y)
+        x2, y2 = window.toScreen(p2.x, p2.y)
+        return window.create_line(x1, y1, x2, y2, options)
 
     def setArrow(self, option):
         if not option in ["first", "last", "both", "none"]:
@@ -939,10 +970,10 @@ class Polygon(GraphicsObject):
         for p in self.points:
             p.move(dx, dy)
 
-    def _draw(self, canvas, options):
-        args = [canvas]
+    def _draw(self, window, options):
+        args = [window]
         for p in self.points:
-            x, y = canvas.toScreen(p.x, p.y)
+            x, y = window.toScreen(p.x, p.y)
             args.append(x)
             args.append(y)
         args.append(options)
@@ -1030,10 +1061,10 @@ class Text(GraphicsObject):
     def __repr__(self):
         return "Text({}, '{}')".format(self.anchor, self.getText())
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p = self.anchor
-        x, y = canvas.toScreen(p.x, p.y)
-        return canvas.create_text(x, y, options)
+        x, y = window.toScreen(p.x, p.y)
+        return window.create_text(x, y, options)
 
     def _move(self, dx, dy):
         self.anchor.move(dx, dy)
@@ -1093,10 +1124,10 @@ class Entry(GraphicsObject):
     def __repr__(self):
         return "Entry({}, {})".format(self.anchor, self.width)
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p = self.anchor
-        x, y = canvas.toScreen(p.x, p.y)
-        frm = tk.Frame(canvas.master)
+        x, y = window.toScreen(p.x, p.y)
+        frm = tk.Frame(window.master)
         self.entry = tk.Entry(frm,
                               width=self.width,
                               textvariable=self.text,
@@ -1106,7 +1137,7 @@ class Entry(GraphicsObject):
         self.entry.pack()
         # self.setFill(self.fill)
         self.entry.focus_set()
-        return canvas.create_window(x, y, window=frm)
+        return window.create_window(x, y, window=frm)
 
     def getText(self):
         return self.text.get()
@@ -1191,11 +1222,11 @@ class Image(GraphicsObject):
     def __repr__(self):
         return "Image({}, {}, {})".format(self.anchor, self.getWidth(), self.getHeight())
 
-    def _draw(self, canvas, options):
+    def _draw(self, window, options):
         p = self.anchor
-        x, y = canvas.toScreen(p.x, p.y)
+        x, y = window.toScreen(p.x, p.y)
         self.imageCache[self.imageId] = self.img  # save a reference
-        return canvas.create_image(x, y, image=self.img)
+        return window.create_image(x, y, image=self.img)
 
     def _move(self, dx, dy):
         self.anchor.move(dx, dy)
