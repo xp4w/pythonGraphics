@@ -150,6 +150,8 @@ __version__ = "5.0"
 
 import time, os, sys, math
 
+from typing import Tuple, List
+
 try:  # import as appropriate for 2.x vs. 3.x
     import tkinter as tk
 except:
@@ -183,7 +185,7 @@ UNSUPPORTED_METHOD = "Object doesn't support operation"
 BAD_OPTION = "Illegal option value"
 
 ##########################################################################
-# global variables and funtions
+# global variables and functions
 
 _root = tk.Tk()
 _root.withdraw()
@@ -204,19 +206,18 @@ def update(rate=None):
 
     _root.update()
 
+
 ############################################################################
 # Graphics classes start here
 
 class GraphWin(tk.Canvas):
     """A GraphWin is a top-level window for displaying graphics."""
 
-    def __init__(self, title="Graphics Window",
-                 width=200, height=200, autoflush=True):
+    def __init__(self, title: str = "Graphics Window", width: int = 600, height: int = 400, autoflush: bool = True):
         assert isinstance(title, str), "Title must be a string"
         master = tk.Toplevel(_root)
         master.protocol("WM_DELETE_WINDOW", self.close)
-        tk.Canvas.__init__(self, master, width=width, height=height,
-                           highlightthickness=0, bd=0)
+        super(GraphWin, self).__init__(master, width=width, height=height, highlightthickness=0, bd=0)
         self.master.title(title)
         self.pack()
         master.resizable(0, 0)
@@ -322,7 +323,7 @@ class GraphWin(tk.Canvas):
         self.update()  # flush any prior clicks
         self.mouseX = None
         self.mouseY = None
-        while self.mouseX == None or self.mouseY == None:
+        while not self.mouseX or not self.mouseY:
             self.update()
             if self.isClosed(): raise GraphicsError("getMouse in closed window")
             time.sleep(.1)  # give up thread
@@ -522,13 +523,13 @@ class Transform:
 #   keys may be present in the configuration dictionary for a given item
 DEFAULT_CONFIG = {"fill": "",
                   "activefill": "",  # BB added ActiveFill 3/9/2018
-                  "outline": "yellow",
-                  "width": "0",
+                  "outline": "#%02x%02x%02x" % (0, 0, 0),
+                  "width": 1,
                   "arrow": "none",
                   "text": "",
                   "justify": "center",
                   "font": ("helvetica", 12, "normal"),
-                  "smooth": "0"}  # Niss added 1.05.2017
+                  "smooth": False}  # Niss added 1.05.2017
 
 
 class GraphicsObject:
@@ -552,10 +553,10 @@ class GraphicsObject:
 
     @property
     def config(self) -> dict:
-        return self.__config
+        return self.__config.copy()
 
     @config.setter
-    def config(self, dictionary: dict):
+    def config(self, dictionary: dict) -> None:
         self.__config = dictionary
 
     @property
@@ -564,7 +565,7 @@ class GraphicsObject:
         return self.__config["fill"]
 
     @fill.setter
-    def fill(self, string: str):
+    def fill(self, string: str) -> None:
         """Set interior color to color"""
         self._reconfig("fill", string)
 
@@ -574,7 +575,7 @@ class GraphicsObject:
         return self.__config["outline"]
 
     @outline.setter
-    def outline(self, string: str):
+    def outline(self, string: str) -> None:
         """Set outline color to color"""
         self._reconfig("outline", string)
 
@@ -584,7 +585,7 @@ class GraphicsObject:
         return self.__config["width"]
 
     @width.setter
-    def width(self, number):
+    def width(self, number: float) -> None:
         """Set line weight to width"""
         self._reconfig("width", number)
 
@@ -594,7 +595,7 @@ class GraphicsObject:
         return self.__config["activefill"]
 
     @activefill.setter
-    def activefill(self, string: str):  # Added By BB 3/8
+    def activefill(self, string: str) -> None:  # Added By BB 3/8
         """Set activefill color to color"""
         self._reconfig("activefill", string)
 
@@ -604,11 +605,11 @@ class GraphicsObject:
         return self.__config["smooth"]
 
     @smooth.setter
-    def smooth(self, boolean: bool):  # Niss: added 1.05.2017
+    def smooth(self, boolean: bool) -> None:  # Niss: added 1.05.2017
         """Set smooth boolean to bool"""
         self._reconfig("smooth", boolean)
 
-    def redraw(self):  # Niss: added 1.05.2017
+    def redraw(self) -> None:  # Niss: added 1.05.2017
         """Redraws the object (i.e. hide it and then makes visible again) aReturns silently if the
         object is not currently drawn."""
         if not self.__window: return
@@ -616,7 +617,7 @@ class GraphicsObject:
             self.__window.delete(self.__id)
         self.__id = self._draw(self.__window, self.__config)
 
-    def draw(self, graphwin):
+    def draw(self, graphwin: GraphWin):
 
         """Draw the object in graphwin, which should be a GraphWin
         object.  A GraphicsObject may only be drawn into one
@@ -632,7 +633,7 @@ class GraphicsObject:
             _root.update()
         return self
 
-    def undraw(self):
+    def undraw(self) -> None:
 
         """Undraw the object (i.e. hide it). Returns silently if the
         object is not currently drawn."""
@@ -646,7 +647,7 @@ class GraphicsObject:
         self.__window = None
         self.__id = None
 
-    def move(self, dx, dy):
+    def move(self, dx: float, dy: float) -> None:
 
         """move object dx units in x direction and dy units in y
         direction"""
@@ -665,12 +666,7 @@ class GraphicsObject:
             if window.autoflush:
                 _root.update()
 
-    def clone(self, *args):
-        other = type(self)(*args)
-        other.__config = self.__config.copy()
-        return other
-
-    def _reconfig(self, option, setting):
+    def _reconfig(self, option: str, setting) -> None:
         # Internal method for changing configuration of the object
         # Raises an error if the option does not exist in the config
         #    dictionary for this object
@@ -683,26 +679,26 @@ class GraphicsObject:
             if self.__window.autoflush:
                 _root.update()
 
-    def _draw(self, window, options):
+    def _draw(self, window: GraphWin, options: dict) -> None:
         """draws appropriate figure on window with options provided
         Returns Tk id of item drawn"""
         pass  # must override in subclass
 
-    def _move(self, dx, dy):
+    def _move(self, dx: float, dy: float) -> None:
         """updates internal state of object to move it dx,dy units"""
         pass  # must override in subclass
 
 
 class Point(GraphicsObject):
-    def __init__(self, x, y):
+    def __init__(self, x: float, y: float):
         super(Point, self).__init__(["outline"])
         self.__x = x
         self.__y = y
 
     def __repr__(self):
-        return f"Point(x = {self.__x}, y = {self.__y})"
+        return f"Point({self.__x}, {self.__y})"
 
-    def _draw(self, window, options):
+    def _draw(self, window: GraphWin, options: dict):
         x, y = window.toScreen(self.__x, self.__y)
         return window.create_rectangle(x, y, x + 1, y + 1, options)
 
@@ -710,31 +706,31 @@ class Point(GraphicsObject):
         self.__x += dx
         self.__y += dy
 
-    # def clone(self):
-    #     other = Point(self.__x, self.__y)
-    #     other.config = self.config.copy()
-    #     return other
-    
+    def clone(self):
+        other = Point(self.__x, self.__y)
+        other.config = self.config
+        return other
+
     @property
-    def position(self):
-        return (self.__x, self.__y)
-    
+    def position(self) -> Tuple[float, float]:
+        return self.__x, self.__y
+
     @position.setter
     def position(self, point):
         self.__x = point.x
         self.__y = point.y
 
     @property
-    def x(self): return self.__x
+    def x(self) -> float: return self.__x
 
     @x.setter
-    def x(self, number):  self.__x = number
+    def x(self, number: float):  self.__x = number
 
     @property
-    def y(self): return self.__y
+    def y(self) -> float: return self.__y
 
     @y.setter
-    def y(self, number): self.__y = number
+    def y(self, number: float): self.__y = number
 
 
 class _BBox(GraphicsObject):
@@ -742,45 +738,47 @@ class _BBox(GraphicsObject):
     # (opposite corners) Line segment is a degenerate case.
 
     def __init__(self, point1: Point, point2: Point,
-                 options=("outline", "width", "fill", "activefill")):  # BB added activefill
+                 options: list = ("outline", "width", "fill", "activefill")):  # BB added activefill
         super(_BBox, self).__init__(options)
-        self.__point1 = point1.clone(point1.x, point1.y)
-        self.__point2 = point2.clone(point2.x, point2.y)
+        self.__point1 = point1.clone()
+        self.__point2 = point2.clone()
 
     def _move(self, dx, dy):
         self.__point1.x += dx
         self.__point1.y += dy
         self.__point2.x += dx
         self.__point2.y += dy
-    
+
     @property
-    def position(self): return Point((self.__point1.x + self.__point2.x) / 2, (self.__point1.y + self.__point2.y) / 2)
-    
+    def position(self) -> Point: return Point((self.__point1.x + self.__point2.x) / 2,
+                                              (self.__point1.y + self.__point2.y) / 2)
+
     @position.setter
-    def position(self, point: Point):
-        self.__point1 = Point(self.__point1.x)
+    def position(self, point: Point) -> None:
+        position = self.position  # temp variable so 'self.position' isn't called twice
+        self._move(point.x - position.x, point.y - position.y)
 
     @property
-    def point1(self): return self.__point1.clone(self.__point1.x, self.__point1.y)
-    
+    def point1(self) -> Point: return self.__point1.clone()
+
     @point1.setter
-    def point1(self, point: Point): self.__point1 = point
+    def point1(self, point: Point) -> None: self.__point1 = point
 
     @property
-    def point2(self): return self.__point2.clone(self.__point2.x, self.__point2.y)
-    
+    def point2(self) -> Point: return self.__point2.clone()
+
     @point2.setter
-    def point2(self, point: Point): self.__point2 = point
+    def point2(self, point: Point) -> None: self.__point2 = point
 
 
 class Rectangle(_BBox):
-    def __init__(self, point1, point2):
+    def __init__(self, point1: Point, point2: Point):
         super(Rectangle, self).__init__(point1, point2)
 
     def __repr__(self):
-        return "Rectangle({}, {})".format(str(self.point1), str(self.point2))
+        return f"Rectangle({self.point1}, {self.point2})"
 
-    def _draw(self, window, options):
+    def _draw(self, window: GraphWin, options: dict):
         point1 = self.point1
         point2 = self.point2
         x1, y1 = window.toScreen(point1.x, point1.y)
@@ -789,7 +787,7 @@ class Rectangle(_BBox):
 
     def clone(self):
         other = Rectangle(self.point1, self.point2)
-        other.config = self.config.copy()
+        other.config = self.config
         return other
 
     @staticmethod  # DJC: Added 04.20.21.14.51
@@ -806,9 +804,9 @@ class Rectangle(_BBox):
     @staticmethod
     def testCollision_RectangleVsCircle(rectangle, circle):
         """Returns True if the circle is colliding with the rectangle. False if not."""
-        xClamp = max(rectangle.point1.x, min(rectangle.point2.x, circle.getCenter().x))
-        yClamp = max(rectangle.point1.y, min(rectangle.point2.y, circle.getCenter().y))
-        if math.sqrt((xClamp - circle.getCenter().x) ** 2 + (yClamp - circle.getCenter().y) ** 2) <= circle.radius:
+        xClamp = max(rectangle.point1.x, min(rectangle.point2.x, circle.position.x))
+        yClamp = max(rectangle.point1.y, min(rectangle.point2.y, circle.position.y))
+        if math.sqrt((xClamp - circle.position.x) ** 2 + (yClamp - circle.position.y) ** 2) <= circle.radius:
             return True
         else:
             return False
@@ -817,60 +815,60 @@ class Rectangle(_BBox):
 class RoundedRectangle(Rectangle):  # BB added 3/9/2018
     """Creates a rectangle with rounded corners of a given radius"""
 
-    def __init__(self, point1, point2, radius=25):
+    def __init__(self, point1: Point, point2: Point, radius: float = 25):
         super(RoundedRectangle, self).__init__(point1, point2)
-        x1 = point1.x
-        x2 = point2.x
-        y1 = point1.y
-        y2 = point2.y
-        self.radius = radius
+        self.__radius = radius
+        x1 = self.point1.x
+        x2 = self.point2.x
+        y1 = self.point1.y
+        y2 = self.point2.y
         # self.points is a list of points that contain rounded corners
-        self.points = [x1 + radius, y1,
-                       x1 + radius, y1,  # segment between x1+radius, y1 and x2-radius , y1 is not rounded
-                       x2 - radius, y1,
-                       x2 - radius, y1,
-                       x2, y1,  # defines the corner that we create a curve out too between adjacent points
-                       x2, y1 + radius,
-                       x2, y1 + radius,
-                       x2, y2 - radius,
-                       x2, y2 - radius,
-                       x2, y2,
-                       x2 - radius, y2,
-                       x2 - radius, y2,
-                       x1 + radius, y2,
-                       x1 + radius, y2,
-                       x1, y2,
-                       x1, y2 - radius,
-                       x1, y2 - radius,
-                       x1, y1 + radius,
-                       x1, y1 + radius,
-                       x1, y1]
+        self.__points = [x1 + self.__radius, y1,
+                         x1 + self.__radius, y1,  # segment between x1+radius, y1 and x2-radius , y1 is not rounded
+                         x2 - self.__radius, y1,
+                         x2 - self.__radius, y1,
+                         x2, y1,  # defines the corner that we create a curve out too between adjacent points
+                         x2, y1 + self.__radius,
+                         x2, y1 + self.__radius,
+                         x2, y2 - self.__radius,
+                         x2, y2 - self.__radius,
+                         x2, y2,
+                         x2 - self.__radius, y2,
+                         x2 - self.__radius, y2,
+                         x1 + self.__radius, y2,
+                         x1 + self.__radius, y2,
+                         x1, y2,
+                         x1, y2 - self.__radius,
+                         x1, y2 - self.__radius,
+                         x1, y1 + self.__radius,
+                         x1, y1 + self.__radius,
+                         x1, y1]
 
     def __repr__(self):
-        return "Rounded Rectangle({}, {}, {})".format(str(self.point1), str(self.point2), str(self.radius))
+        return f"RoundedRectangle({self.point1}, {self.point2}, {self.__radius})"
 
     def clone(self):
-        other = RoundedRectangle(self.point1, self.point2, self.radius)
-        other.config = self.config.copy()
+        other = RoundedRectangle(self.point1, self.point2, self.__radius)
+        other.config = self.config
         return other
 
-    def _draw(self, window, options):
-        return window.create_polygon(self.points, options, smooth=True)
+    def _draw(self, window: GraphWin, options: dict):
+        return window.create_polygon(self.__points, options, smooth=True)
 
 
 class Oval(_BBox):
-    def __init__(self, point1, point2):
+    def __init__(self, point1: Point, point2: Point):
         super(Oval, self).__init__(point1, point2)
 
     def __repr__(self):
-        return "Oval({}, {})".format(str(self.point1), str(self.point2))
+        return f"Oval({self.point1}, {self.point2})"
 
     def clone(self):
         other = Oval(self.point1, self.point2)
-        other.config = self.config.copy()
+        other.config = self.config
         return other
 
-    def _draw(self, window, options):
+    def _draw(self, window: GraphWin, options: dict):
         point1 = self.point1
         point2 = self.point2
         x1, y1 = window.toScreen(point1.x, point1.y)
@@ -882,24 +880,24 @@ class Arc(_BBox):
     """Creates an arc, sector, or chord given opposite corners of a bounding box
     a starting angle, and a rotation in degrees"""
 
-    def __init__(self, point1, point2, startAngle, rotation, style="SECTOR"):
-        _BBox.__init__(self, point1, point2)
-        self.startAngle = startAngle
-        self.rotation = rotation
-        self.styleAsString = style.upper()
-        if (self.styleAsString == "SECTOR"):
-            self.style = tk.PIESLICE
-        elif (self.styleAsString == "CHORD"):
-            self.style = tk.CHORD
+    def __init__(self, point1: Point, point2: Point, startAngle: float, rotation: float, style: str = "SECTOR"):
+        super(Arc, self).__init__(point1, point2)
+        self.__startAngle = startAngle
+        self.__rotation = rotation
+        self.__styleAsString = style.upper()
+        if self.__styleAsString == "SECTOR":
+            self.__style = tk.PIESLICE
+        elif self.__styleAsString == "CHORD":
+            self.__style = tk.CHORD
         else:
-            self.style = tk.ARC
+            self.__style = tk.ARC
 
     def __repr__(self):
-        return "Arc({},{},{},{})".format(str(self.point1), str(self.point2), str(self.startAngle), str(self.rotation))
+        return f"Arc({self.point1}, {self.point2}, {self.__startAngle}, {self.__rotation})"
 
     def clone(self):
-        other = Arc(self.point1, self.point2, self.startAngle, self.rotation, self.styleAsString)
-        other.config = self.config.copy()
+        other = Arc(self.point1, self.point2, self.__startAngle, self.__rotation, self.__styleAsString)
+        other.config = self.config
         return other
 
     def _draw(self, window, options):
@@ -907,87 +905,92 @@ class Arc(_BBox):
         point2 = self.point2
         x1, y1 = window.toScreen(point1.x, point1.y)
         x2, y2 = window.toScreen(point2.x, point2.y)
-        return window.create_arc(x1, y1, x2, y2, options, style=self.style, start=self.startAngle, extent=self.rotation)
+        return window.create_arc(x1, y1, x2, y2, options, style=self.__style, start=self.__startAngle,
+                                 extent=self.__rotation)
 
 
 class Circle(Oval):
-    def __init__(self, center, radius):
-        point1 = Point(center.x - radius, center.y - radius)
-        point2 = Point(center.x + radius, center.y + radius)
-        Oval.__init__(self, point1, point2)
-        self.radius = radius
+    def __init__(self, position: Point, radius: float):
+        super(Circle, self).__init__(Point(position.x - radius, position.y - radius),
+                                     Point(position.x + radius, position.y + radius))
+        self.__position = position
+        self.__radius = radius
 
     def __repr__(self):
-        return "Circle({}, {})".format(str(self.getCenter()), str(self.radius))
+        return f"Circle({self.__position}, {self.__radius})"
 
     def clone(self):
-        other = Circle(self.getCenter(), self.radius)
-        other.config = self.config.copy()
+        other = Circle(self.__position, self.__radius)
+        other.config = self.config
         return other
 
-    def getRadius(self):
-        return self.radius
+    @property
+    def radius(self) -> float:
+        return self.__radius
 
-    def setCenter(self, point):  # DJC: Added 04.21.21.18.51
-        self._move(point.x - self.getCenter().x, point.y - self.getCenter().y)
+    @radius.setter
+    def radius(self, number: float) -> None:
+        self.__radius = number
 
     @staticmethod  # DJC: Added 04.20.21.14.51
     def testCollision_CircleVsCircle(circle1, circle2):
         """Returns True if the two Circles are colliding, False if not."""
-        c1 = circle1.getCenter()
-        c2 = circle2.getCenter()
+        c1 = circle1.position
+        c2 = circle2.position
         distanceSquared = (c1.x - c2.x) ** 2 + (c1.y - c2.y) ** 2
         return distanceSquared <= (circle1.radius + circle2.radius) ** 2
 
     @staticmethod  # DJC: Added 04.20.21.14.51
     def testCollision_CircleVsPoint(circle, point):
         """Returns True if the Point is colliding with the Circle, False if not."""
-        distanceSquared = (point.x - circle.getCenter().x) ** 2 + (point.y - circle.getCenter().y) ** 2
+        distanceSquared = (point.x - circle.position.x) ** 2 + (point.y - circle.position.y) ** 2
         return distanceSquared <= circle.radius ** 2
 
+    @staticmethod
     def testCollision_CircleVsRectangle(circle, rectangle):
         """Returns True if the circle is colliding with the rectangle. False if not."""
-        xClamp = max(rectangle.point1.x, min(rectangle.point2.x, circle.getCenter().x))
-        yClamp = max(rectangle.point1.y, min(rectangle.point2.y, circle.getCenter().y))
-        if math.sqrt((xClamp - circle.getCenter().x) ** 2 + (yClamp - circle.getCenter().y) ** 2) <= circle.radius:
+        xClamp = max(rectangle.point1.x, min(rectangle.point2.x, circle.position.x))
+        yClamp = max(rectangle.point1.y, min(rectangle.point2.y, circle.position.y))
+        if math.sqrt((xClamp - circle.position.x) ** 2 + (yClamp - circle.position.y) ** 2) <= circle.radius:
             return True
         else:
             return False
 
 
 class Line(_BBox):
-    def __init__(self, point1, point2):
-        _BBox.__init__(self, point1, point2, ["arrow", "fill", "width"])
-        self.setFill(DEFAULT_CONFIG['outline'])
-        self.setOutline = self.setFill
+    def __init__(self, point1: Point, point2: Point):
+        super(Line, self).__init__(point1, point2, ["arrow", "fill", "width"])
+        self.fill = DEFAULT_CONFIG['outline']
 
     def __repr__(self):
-        return "Line({}, {})".format(str(self.point1), str(self.point2))
+        return f"Line({self.point1}, {self.point2})"
+
+    @property
+    def arrow(self):
+        return self.config["arrow"]
+
+    @arrow.setter
+    def arrow(self, option: str):
+        if option not in ["first", "last", "both", "none"]:
+            raise GraphicsError(BAD_OPTION)
+        self._reconfig("arrow", option)
 
     def clone(self):
         other = Line(self.point1, self.point2)
-        other.config = self.config.copy()
+        other.config = self.config
         return other
 
-    def _draw(self, window, options):
+    def _draw(self, window: GraphWin, options: dict):
         point1 = self.point1
         point2 = self.point2
         x1, y1 = window.toScreen(point1.x, point1.y)
         x2, y2 = window.toScreen(point2.x, point2.y)
         return window.create_line(x1, y1, x2, y2, options)
 
-    def setArrow(self, option):
-        if not option in ["first", "last", "both", "none"]:
-            raise GraphicsError(BAD_OPTION)
-        self._reconfig("arrow", option)
-
 
 class Polygon(GraphicsObject):
-    def __init__(self, *points):
-        # if points passed as a list, extract it
-        if len(points) == 1 and type(points[0]) == type([]):
-            points = points[0]
-        self.points = list(map(Point.clone, points))
+    def __init__(self, *args: Point):
+        self.points = list(map(Point.clone, args))
         GraphicsObject.__init__(self,
                                 ["outline", "width", "fill", "activefill", "smooth"])  # BB added activefill 3/9/2018
         # Niss added "smooth" 04_05_2017
@@ -997,7 +1000,7 @@ class Polygon(GraphicsObject):
 
     def clone(self):
         other = Polygon(*self.points)
-        other.config = self.config.copy()
+        other.config = self.config
         return other
 
     def getPoints(self):
@@ -1092,8 +1095,7 @@ class Text(GraphicsObject):
         GraphicsObject.__init__(self, ["justify", "fill", "text", "font"])
         self.setText(text)
         self.anchor = p.clone()
-        self.setFill(DEFAULT_CONFIG['outline'])
-        self.setOutline = self.setFill
+        self.fill = DEFAULT_CONFIG["outline"]
 
     def __repr__(self):
         return "Text({}, '{}')".format(self.anchor, self.getText())
@@ -1108,7 +1110,7 @@ class Text(GraphicsObject):
 
     def clone(self):
         other = Text(self.anchor, self.config['text'])
-        other.config = self.config.copy()
+        other.config = self.config
         return other
 
     def setText(self, text):
@@ -1142,7 +1144,7 @@ class Text(GraphicsObject):
             raise GraphicsError(BAD_OPTION)
 
     def setTextColor(self, color):
-        self.setFill(color)
+        self.fill = (color)
 
 
 class Entry(GraphicsObject):
@@ -1187,7 +1189,7 @@ class Entry(GraphicsObject):
 
     def clone(self):
         other = Entry(self.anchor, self.width)
-        other.config = self.config.copy()
+        other.config = self.config
         other.text = tk.StringVar()
         other.text.set(self.text.get())
         other.fill = self.fill
@@ -1282,7 +1284,7 @@ class Image(GraphicsObject):
         other = Image(Point(0, 0), 0, 0)
         other.img = self.img.copy()
         other.anchor = self.anchor.clone()
-        other.config = self.config.copy()
+        other.config = self.config
         return other
 
     def getWidth(self):
@@ -1354,10 +1356,8 @@ class Image(GraphicsObject):
     @staticmethod  # DJC: Added 04.20.21.14.51
     def testCollision_ImageVsPoint(image, point):
         """Returns True if the Point is colliding with the Image, False if not."""
-        return point.x >= image.anchor.x - image.getWidth() / 2 and \
-               point.x <= image.anchor.x + image.getWidth() / 2 and \
-               point.y >= image.anchor.y - image.getHeight() / 2 and \
-               point.y <= image.anchor.y + image.getHeight() / 2
+        return image.anchor.x - image.getWidth() / 2 <= point.x <= image.anchor.x + image.getWidth() / 2 and \
+               image.anchor.y - image.getHeight() / 2 <= point.y <= image.anchor.y + image.getHeight() / 2
 
 
 def color_rgb(r, g, b):
@@ -1418,4 +1418,4 @@ def test():
 update()
 
 if __name__ == "__main__":
-    t
+    test()
