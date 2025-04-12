@@ -203,7 +203,6 @@ def update(rate=None):
             _update_lasttime = now + pauseLength
         else:
             _update_lasttime = now
-
     _root.update()
 
 
@@ -750,8 +749,8 @@ class _BBox(GraphicsObject):
         self.__point2.y += dy
 
     @property
-    def position(self) -> Point: return Point((self.__point1.x + self.__point2.x) / 2,
-                                              (self.__point1.y + self.__point2.y) / 2)
+    def position(self) -> Point:
+        return Point((self.__point1.x + self.__point2.x) / 2, (self.__point1.y + self.__point2.y) / 2)
 
     @position.setter
     def position(self, point: Point) -> None:
@@ -990,29 +989,34 @@ class Line(_BBox):
 
 class Polygon(GraphicsObject):
     def __init__(self, *args: Point):
-        self.points = list(map(Point.clone, args))
-        GraphicsObject.__init__(self,
-                                ["outline", "width", "fill", "activefill", "smooth"])  # BB added activefill 3/9/2018
+        # BB added activefill 3/9/2018
         # Niss added "smooth" 04_05_2017
+        super(Polygon, self).__init__(["outline", "width", "fill", "activefill", "smooth"])
+        self.__points = list(map(Point.clone, args))
 
     def __repr__(self):
-        return "Polygon" + str(tuple(p for p in self.points))
+        return f"Polygon{tuple(self.__points)}"
 
     def clone(self):
-        other = Polygon(*self.points)
+        other = Polygon(*self.__points)
         other.config = self.config
         return other
 
-    def getPoints(self):
-        return list(map(Point.clone, self.points))
+    @property
+    def points(self) -> List[Point]:
+        return list(map(Point.clone, self.__points))
 
-    def _move(self, dx, dy):
-        for p in self.points:
+    @points.setter
+    def points(self, *args: Point) -> None:
+        self.__points = list(map(Point.clone, args))
+
+    def _move(self, dx: float, dy: float):
+        for p in self.__points:
             p.move(dx, dy)
 
     def _draw(self, window, options):
         args = [window]
-        for p in self.points:
+        for p in self.__points:
             x, y = window.toScreen(p.x, p.y)
             args.append(x)
             args.append(y)
@@ -1023,51 +1027,53 @@ class Polygon(GraphicsObject):
 class RotatablePolygon(Polygon):  # Niss: added 1.05.2017
     """Creates an Polygon that can be rotated."""
 
-    def __init__(self, *points):
-        # if points passed as a list, extract it
-        if len(points) == 1 and type(points[0] == type([])):
-            points = points[0]
-        points = list(map(Point.clone, points))
-        Polygon.__init__(self, points)
-        self.theta = 0
-        self.orig_points = points  # must recalc each rot w/ original pts or rounding
-        # creates degredation of poly shape
-        self.center = None
-        self.find_centroid()
+    def __init__(self, *args):
+        super(RotatablePolygon, self).__init__(*args)
+        self.__theta = 0
+        self.__orig_points = self.points  # must recalculate each rot w/ original pts or rounding
+        # creates degradation of poly shape
+        self.__center = self.find_centroid()
 
-    def rotate(self, degrees=0, about=None):
+    def rotate(self, degrees: int = 0, about: Point = None):
         """rotates a Polygon object // DEGREES = how far CCW the object is rotated //
         ABOUT = the center of rotation"""
-        if about == None:
-            about = self.center
-        self.theta = (self.theta + degrees) % 360
+        if not about:
+            about = self.__center
+        self.__theta = (self.__theta + degrees) % 360
         if degrees != 0:
-            radians = (self.theta * math.pi) / 180
-            for i in range(len(self.orig_points)):
-                orig_x_diff = self.orig_points[i].getX() - about.getX()
-                orig_y_diff = self.orig_points[i].getY() - about.getY()
+            radians = (self.__theta * math.pi) / 180
+            for i in range(len(self.__orig_points)):
+                orig_x_diff = self.__orig_points[i].x - about.x
+                orig_y_diff = self.__orig_points[i].y - about.x
                 newx = orig_x_diff * math.cos(radians) + orig_y_diff * math.sin(radians)
                 newy = orig_y_diff * math.cos(radians) - orig_x_diff * math.sin(radians)
-                dx = newx - self.points[i].getX()
-                dy = newy - self.points[i].getY()
-                self.points[i].move(dx + about.getX(), dy + about.getY())
+                dx = newx - self.points[i].x
+                dy = newy - self.points[i].y
+                self.points[i].move(dx + about.x, dy + about.y)
             self.redraw()
             self.find_centroid()
 
-    def find_centroid(self):
+    @property
+    def center(self) -> Point:
+        return self.__center.clone()
+
+    @center.setter
+    def center(self, point: Point):
+        self.__center = point
+
+    def find_centroid(self) -> Point:
         """calculates the centroid of a polygon"""
         x_sum = 0
         y_sum = 0
         for p in self.points:
-            x_sum += p.getX()
-            y_sum += p.getY()
-        self.center = Point(round(x_sum / len(self.points)), round(y_sum / len(self.points)))
-        return self.center
+            x_sum += p.x
+            y_sum += p.y
+        return Point(round(x_sum / len(self.points)), round(y_sum / len(self.points)))
 
-    def _move(self, dx, dy):
+    def _move(self, dx: float, dy: float):
         """Overrides Polygon _move() to to add recalculation of centroid point for rotation purposes"""
         Polygon._move(self, dx, dy)
-        for p in self.orig_points:
+        for p in self.__orig_points:
             p.move(dx, dy)
         self.find_centroid()
 
@@ -1084,7 +1090,7 @@ class RotatableOval(RotatablePolygon):  # Niss: added 1.05.2017
             x = round(center.getX() + self.x_radius * math.cos(i * math.pi / 18))
             y = round(center.getY() + self.y_radius * math.sin(i * math.pi / 18))
             coords.append(Point(x, y))
-        RotatablePolygon.__init__(self, coords)
+        RotatablePolygon.__init__(self, *coords)
         GraphicsObject.__init__(self, ["outline", "width", "fill", "smooth"])
         self.center = center
         self.about = self.center
